@@ -14,6 +14,7 @@ from face_recognition.arcface.model import iresnet_inference
 from face_recognition.arcface.utils import compare_encodings, read_features
 from face_tracking.tracker.byte_tracker import BYTETracker
 from face_tracking.tracker.visualize import plot_tracking
+from api.post import get_current_time, fetch_data, put
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -268,6 +269,10 @@ def recognize():
                             caption = "UN_KNOWN"
                         else:
                             caption = f"{name}:{score:.2f}"
+                            time = get_current_time
+                            take = fetch_data
+                            put(time, name, take)
+                            
 
                     id_face_mapping[tracking_ids[i]] = caption
 
