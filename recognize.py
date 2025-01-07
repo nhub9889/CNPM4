@@ -20,16 +20,16 @@ from api.post import diem_danh, get_current_time
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Face detector (choose one)
-detector = SCRFD(model_file="C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_detection/scrfd/weights/scrfd_2.5g_bnkps.onnx")
+detector = SCRFD(model_file="./face_detection/scrfd/weights/scrfd_2.5g_bnkps.onnx")
 # detector = Yolov5Face(model_file="face_detection/yolov5_face/weights/yolov5n-face.pt")
 
 # Face recognizer
 recognizer = iresnet_inference(
-    model_name="r100", path="C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_recognition/arcface/weights/arcface_r100.pth", device=device
+    model_name="r100", path="./arcface/weights/arcface_r100.pth", device=device
 )
 
 # Load precomputed face features and names
-images_names, images_embs = read_features(feature_path="C:/Users/Lenovo/Desktop/cnpm/face-recognition/datasets/face_features/feature")
+images_names, images_embs = read_features(feature_path="./datasets/face_features/feature")
 
 # Mapping of face IDs to names
 id_face_mapping = {}
@@ -311,7 +311,7 @@ def recognize():
 
 def main():
     """Main function to start face tracking and recognition threads."""
-    file_name = "C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_tracking/config/config_tracking.yaml"
+    file_name = "./face_tracking/config/config_tracking.yaml"
     config_tracking = load_config(file_name)
 
     # Start tracking thread
