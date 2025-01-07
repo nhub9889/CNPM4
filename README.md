@@ -40,7 +40,7 @@ conda activate face-dev
 ```
 
 ```shell
-pip install torch==1.9.1+cpu torchvision==0.10.1+cpu torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch==2.2.0+cpu torchvision==0.17.0+cpu torchaudio==2.2.0+cpu -f https://download.pytorch.org/whl/torch_stable.html 
 pip install -r requirements.txt
 ```
 

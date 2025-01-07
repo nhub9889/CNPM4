@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chọn Lớp Học và Mã Phòng</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 50%;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        #recognizeOutput {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .error-text {
+            color: red;
+        }
+        .output-text {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <h1>Chọn Phòng học và Buổi Học</h1>
+    
+    <label for="classSelect">Chọn Phòng Học:</label>
+    <select id="classSelect">
+        <option value="">-- Chọn Mã Phòng Học --</option>
+        <!-- Các lớp học sẽ được tải ở đây -->
+    </select>
+
+    <p id="activeSessionMessage"></p>
+    <button onclick="submitSelection()">Gửi</button>
+
+</div>
+
+<script>
+    // Lấy danh sách phòng học từ API
+    async function fetchRooms() {
+        console.log("Fetching rooms...");  // Log to check if fetchRooms is called
+        try {
+            const response = await fetch('http://localhost:8000/phonghoc');  // API to fetch room data
+            if (!response.ok) {
+                throw new Error('Failed to load rooms: ' + response.statusText);
+            }
+            const rooms = await response.json();
+            const classSelect = document.getElementById('classSelect');  // Ensure you're selecting the correct element
+        
+            // Clear existing options before populating
+            classSelect.innerHTML = '<option value="">-- Chọn Mã Phòng Học --</option>';
+        
+            rooms.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room.MaP;  // Room ID (map)
+                option.textContent = room.TenPhong;  // Room name (tenp)
+                classSelect.appendChild(option);  // Append to the classSelect dropdown
+            });
+        } catch (error) {
+            console.error('Lỗi khi tải danh sách phòng học:', error);
+        }
+    }
+    
+    async function fetchActiveSession(roomCode) {
+        try {
+            console.log(`Fetching active session for room: ${roomCode}`);
+            const response = await fetch(`http://localhost:8000/buoihoc?MaP=${roomCode}`);
+            if (!response.ok) {
+                throw new Error('Failed to load sessions: ' + response.statusText);
+            }
+            const sessions = await response.json();
+            console.log("Fetched sessions:", sessions);  // Log the response to check the data
+        
+            // Get current date and time
+            const now = new Date();
+            console.log("Current time:", now);  // Log current time for comparison
+        
+            let activeSession = null;
+        
+            // Loop through sessions to find the active one
+            sessions.forEach(session => {
+                const gioHocParts = session.GioHoc.split(' ');  // Split into date and time parts
+                const gioHocDateParts = gioHocParts[0].split('/');  // Split date (dd/mm/yyyy)
+                const gioHocTimeParts = gioHocParts[1].split(':');  // Split time (hh:mm)
+                const gioHoc = new Date(gioHocDateParts[2], gioHocDateParts[1] - 1, gioHocDateParts[0], gioHocTimeParts[0], gioHocTimeParts[1]);
+    
+                const gioKetThucParts = session.GioKetThuc.split(' ');  // Split into date and time parts
+                const gioKetThucDateParts = gioKetThucParts[0].split('/');  // Split date (dd/mm/yyyy)
+                const gioKetThucTimeParts = gioKetThucParts[1].split(':');  // Split time (hh:mm)
+                const gioKetThuc = new Date(gioKetThucDateParts[2], gioKetThucDateParts[1] - 1, gioKetThucDateParts[0], gioKetThucTimeParts[0], gioKetThucTimeParts[1]);
+    
+                console.log("Session start:", gioHoc, "Session end:", gioKetThuc);  // Log the parsed times
+    
+                // Check if the current time is between GioHoc and GioKetThuc
+                if (gioHoc <= now && gioKetThuc >= now) {
+                    activeSession = session;  // Mark this session as the active one
+                }
+            });
+            const activeSessionMessage = document.getElementById('activeSessionMessage');
+            if (activeSession) {
+                activeSessionMessage.textContent = `Điểm danh buổi học: ${activeSession.MaMH} lúc ${new Date(activeSession.GioHoc).toLocaleString()}`;
+            } else {
+                activeSessionMessage.textContent = "Không có buổi học nào đang diễn ra ngay bây giờ.";
+            }
+            return activeSession;  // Return the active session or null if not found
+        } catch (error) {
+            console.error('Error fetching active session:', error);
+            return null;  // Return null in case of an error
+        }
+    }
+    
+    
+    
+    // Xử lý sự kiện thay đổi phòng học
+    document.getElementById('classSelect').addEventListener('change', (event) => {
+        const roomCode = event.target.value;
+        if (roomCode) {
+            fetchActiveSession(roomCode);  // Automatically fetch and display the active session for the selected room
+        } else {
+            document.getElementById('activeSessionMessage').textContent = '';  // Clear active session message
+        }
+    });
+    // Hàm gửi lựa chọn của người dùng
+
+    async function submitSelection() {
+        const roomCode = document.getElementById('classSelect').value;
+        if (!roomCode) {
+            alert('Vui lòng chọn phòng học!');
+            return;
+        }
+    
+        try {
+            const activeSession = await fetchActiveSession(roomCode);
+            if (!activeSession) {
+                alert('Không có buổi học nào đang diễn ra.');
+                return;
+            }
+    
+            // Gọi API để khởi động recognize.py
+            const response = await fetch('http://localhost:8000/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    MaBH: activeSession.MaBH,
+                    MaGVDD: activeSession.MaGVDD,
+                    MaMH: activeSession.MaMH,
+                    GioHoc: activeSession.GioHoc,
+                    GioKetThuc: activeSession.GioKetThuc
+                })
+            });
+    
+            const data = await response.json();
+            alert(data.message);  // Thông báo kết quả
+    
+        } catch (error) {
+            console.error('Error:', error);
+            alert(`Lỗi: ${error.message}`);
+        }
+    }
+
+    // Gọi API khi tải trang
+    window.onload = function() {
+        console.log("Page loaded. Calling fetchRooms...");
+        fetchRooms();
+    };
+</script>
+
+</body>
+</html>

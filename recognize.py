@@ -1,6 +1,6 @@
 import threading
 import time
-
+import sys
 import cv2
 import numpy as np
 import torch
@@ -14,22 +14,22 @@ from face_recognition.arcface.model import iresnet_inference
 from face_recognition.arcface.utils import compare_encodings, read_features
 from face_tracking.tracker.byte_tracker import BYTETracker
 from face_tracking.tracker.visualize import plot_tracking
-from api.post import get_current_time, fetch_data, put
+from api.post import diem_danh, get_current_time
 
 # Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Face detector (choose one)
-detector = SCRFD(model_file="face_detection/scrfd/weights/scrfd_2.5g_bnkps.onnx")
+detector = SCRFD(model_file="C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_detection/scrfd/weights/scrfd_2.5g_bnkps.onnx")
 # detector = Yolov5Face(model_file="face_detection/yolov5_face/weights/yolov5n-face.pt")
 
 # Face recognizer
 recognizer = iresnet_inference(
-    model_name="r100", path="face_recognition/arcface/weights/arcface_r100.pth", device=device
+    model_name="r100", path="C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_recognition/arcface/weights/arcface_r100.pth", device=device
 )
 
 # Load precomputed face features and names
-images_names, images_embs = read_features(feature_path="./datasets/face_features/feature")
+images_names, images_embs = read_features(feature_path="C:/Users/Lenovo/Desktop/cnpm/face-recognition/datasets/face_features/feature")
 
 # Mapping of face IDs to names
 id_face_mapping = {}
@@ -250,6 +250,19 @@ def tracking(detector, args):
 
 def recognize():
     """Face recognition in a separate thread."""
+    # Kiểm tra command line arguments
+    if len(sys.argv) < 6:
+        print("ERROR: Missing required arguments")
+        print("Usage: python script.py MaBH MaGVDD MaMH GioHoc GioKetThuc")
+        return
+
+    # Lấy các tham số command line
+    MaBH = sys.argv[1]
+    MaGVDD = sys.argv[2]
+    MaMH = sys.argv[3]
+    GioHoc = sys.argv[4]
+    GioKetThuc = sys.argv[5]
+
     while True:
         raw_image = data_mapping["raw_image"]
         detection_landmarks = data_mapping["detection_landmarks"]
@@ -269,25 +282,36 @@ def recognize():
                             caption = "UN_KNOWN"
                         else:
                             caption = f"{name}:{score:.2f}"
-                            time = get_current_time
-                            take = fetch_data
-                            put(time, name, take)
-                            
+                            # Thêm chức năng điểm danh khi nhận dạng thành công
+                            try:
+                                current_time = get_current_time()
+                                result = diem_danh(
+                                    mssv=name,
+                                    MaBH=MaBH,
+                                    MaGVDD=MaGVDD,
+                                    MaMon=MaMH,
+                                    GioHoc=GioHoc,
+                                    GioKetThuc=GioKetThuc,
+                                    GioVao=current_time
+                                )
+                                
+                            except Exception as e:
+                                print(f"Lỗi khi điểm danh: {str(e)}")
 
                     id_face_mapping[tracking_ids[i]] = caption
 
                     detection_bboxes = np.delete(detection_bboxes, j, axis=0)
                     detection_landmarks = np.delete(detection_landmarks, j, axis=0)
-
                     break
 
         if tracking_bboxes == []:
-            print("Waiting for a person...")
+            print("Waiting for a person...", flush= True)
+
 
 
 def main():
     """Main function to start face tracking and recognition threads."""
-    file_name = "./face_tracking/config/config_tracking.yaml"
+    file_name = "C:/Users/Lenovo/Desktop/cnpm/face-recognition/face_tracking/config/config_tracking.yaml"
     config_tracking = load_config(file_name)
 
     # Start tracking thread

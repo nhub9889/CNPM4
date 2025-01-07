@@ -1,95 +1,92 @@
 import requests
 import datetime
 
+
+# API endpoints
+api_DD = "http://127.0.0.1:8000/diemdanh"
+api_checkDD = "http://127.0.0.1:8000/check_diemdanh"
+api_checkSV = "http://127.0.0.1:8000/check_sinhvien"
+
+# Function to get the current time
 def get_current_time():
-    # Get the current time
     current_time = datetime.datetime.now()
+    return current_time.strftime("%d/%m/%Y %H:%M")  # Return as string in expected format
 
-    # Return the current time as a string (you can format it as you like)
-    return current_time
+# Function to check the attendance status based on class start time and check-in time
+def check_attendance_status(gio_hoc, gio_vao):
+    """
+    Returns:
+    - 1 if the student is late (i.e., check-in time is more than 15 minutes after class start time)
+    - 0 if the student is on time (check-in time is within 15 minutes of class start time)
+    """
+    gio_hoc_time = datetime.datetime.strptime(gio_hoc, "%d/%m/%Y %H:%M")
+    gio_vao_time = datetime.datetime.strptime(gio_vao, "%d/%m/%Y %H:%M")
+    time_diff = gio_vao_time - gio_hoc_time
 
-api_fetch = "http://127.0.0.1:3001/auth"
-api_post = "http://127.0.0.1:3001/auth/put"
-
-# Payload for updating the record
-payload = {
-    "_id": "676e15742cca62d12b63077b",  # The _id of the record you want to update
-    "TrangThai": 1 
-}
-
-# "send" holds the fields to send to the API
-send = {
-    "MADD": "",
-    "TenGVDD": "",
-    "TenSVDuocDD": "",
-    "TenPhongHoc": "",
-    "GioDiemDanh": "",
-    "GioVaoHocCuaSV": "",
-    "TrangThai": ""
-}
+    if time_diff > datetime.timedelta(minutes=15):
+        return 2  # Student is late
+    else:
+        return 1  # Student is on time
 
 
-def fetch_data():
-    take = {
-        "TenGVDD": "",
-        "TenPhongHoc": "",
-        "GioVaoHocCuaSV": ""
-    }
+def diem_danh(mssv, MaBH, MaGVDD, MaMon, GioHoc, GioKetThuc, GioVao):
     try:
-        response = requests.get(api_fetch)
+        # Kiểm tra điểm danh - sử dụng parameters
+        check_url = f"{api_checkDD}?mabh={MaBH}&mssv={mssv}"
+        response = requests.get(check_url)
 
-        # Checking if the request was successful (status code 200)
-        if response.status_code == 200:
-            # Parse the JSON response
+        if response.status_code != 200:
+            print(f"Lỗi khi gọi API kiểm tra trạng thái điểm danh: {response.status_code}")
+            return None
+
+        check_data = response.json()
+        if check_data.get("exists") == "1":
+            print("Sinh viên đã điểm danh rồi.")
+            return {"message": "Sinh viên đã điểm danh rồi."}
+
+        # Kiểm tra sinh viên - sử dụng parameters
+        check_url_sinhvien = f"{api_checkSV}?ma_bh={MaBH}&ma_sv={mssv}"
+        response = requests.get(check_url_sinhvien)
+
+        if response.status_code != 200:
+            print(f"Lỗi khi gọi API kiểm tra sự có mặt của sinh viên: {response.status_code}")
+            return None
+
+        check_data_sinhvien = response.json()
+        if "message" in check_data_sinhvien and check_data_sinhvien["message"] == "Sinh viên không có mặt trong buổi học.":
+            print("Sinh viên không có mặt trong buổi học.")
+            return {"message": "Sinh viên không có mặt trong buổi học."}
+
+        # Nếu sinh viên có mặt, tiến hành điểm danh
+        status = check_attendance_status(GioHoc, GioVao)
+        if status is None:
+            print("Lỗi: Không thể kiểm tra thời gian.")
+            return None
+
+        # Chuẩn bị payload để gửi tới API điểm danh
+        diemdanh_payload = {
+            "MaSVDD": str(mssv),
+            "MaDD": str(mssv+MaBH),
+            "MaGVDD": str(MaGVDD),
+            "MaBH": str(MaBH),
+            "MaMH": str(MaMon),
+            "GioDD": str(GioHoc),
+            "GioSinhVienDD": str(GioVao),
+            "TrangThai": status
+        }
+
+        # Gửi POST request để điểm danh với body
+        response = requests.post(api_DD, json=diemdanh_payload)
+
+        if response.status_code == 201:
             data = response.json()
-
-            # Extract the required fields and update the take dictionary
-            take["TenGVDD"] = data.get("TenGVDD", "")
-            take["TenPhongHoc"] = data.get("TenPhongHoc", "")
-            take["GioVaoHocCuaSV"] = data.get("GioVaoHocCuaSV", "")
-
-            # Return the updated dictionary
-            return take  # Return the updated take dictionary
+            print("Điểm danh thành công:", data)
+            return data
         else:
-            print(f"Error: Failed to retrieve data. Status code: {response.status_code}")
+            print(f"Error: Không thể điểm danh. Mã lỗi: {response.status_code}", flush= True)
+            print("Thông báo từ API:", response.json(), flush= True)
             return None
 
     except requests.exceptions.RequestException as e:
-        # Catch network-related errors or invalid API URL
-        print(f"Error occurred while fetching data: {e}")
+        print(f"Lỗi khi gọi API: {e}")
         return None
-
-
-def put(time, tenSVDD, take):
-    print(f"take: {take}")  # Debugging line to check the structure of 'take'
-    
-    if not isinstance(take, dict):
-        print("Error: 'take' is not a dictionary.")
-        return
-    
-    # Set the values to the "send" dictionary
-    send = {}
-    send["TenGVDD"] = take.get("TenGVDD", "Default Name")  # Use .get() to avoid KeyError if key is missing
-    send["TenPhongHoc"] = take.get("TenPhongHoc", "Default Room")
-    send["GioVaoHocCuaSV"] = take.get("GioVaoHocCuaSV", "Default Time")
-    send["TenSVDuocDD"] = tenSVDD
-    send["GioVaoHocCuaSv"] = time
-
-    # Check if the time is earlier than the student's scheduled entry time
-    if time < take.get("GioVaoHocCuaSV", time):  # Default to 'time' if GioVaoHocCuaSV is not provided
-        send["TrangThai"] = 1
-    else:
-        send["TrangThai"] = 0  # Set status to 1 if the student arrives on time or later
-    
-    # Sending a PUT request to the API with the payload
-    try:
-        response = requests.put(api_post, json=send)
-        
-        # Checking if the request was successful (status code 200)
-        if response.status_code == 200:
-            print(f"Updated record successfully")
-        else:
-            print(f"Failed to update record. Status code: {response.status_code}")
-    except Exception as e:
-        # Catch any exceptions during the API request
-        print(f"Error occurred while making the API request: {e}")
